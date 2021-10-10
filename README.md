@@ -1,4 +1,8 @@
-# golang-sql
+# go-sql
+
+## TODO
+
+- リリースの自動化
 
 ## Usage
 
