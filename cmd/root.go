@@ -132,6 +132,7 @@ func callback(cmd *cobra.Command, args []string) {
 	for _, q := range queries {
 		_, err := tx.Query(q)
 		if err != nil {
+			fmt.Printf("クエリ: %v\n", q)
 			fmt.Printf("クエリ実行エラー: %v\n", err)
 			if err := tx.Rollback(); err != nil {
 				fmt.Printf("ロールバックエラー: %v\n", err)
