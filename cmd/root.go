@@ -124,13 +124,24 @@ func callback(cmd *cobra.Command, args []string) {
 	defer db.Close()
 
 	// クエリの実行
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Printf("トランザクション開始時エラー: %v", err)
+		os.Exit(1)
+	}
 	for _, q := range queries {
-		_, err := db.Query(q)
+		_, err := tx.Query(q)
 		if err != nil {
 			fmt.Printf("クエリ実行エラー: %v\n", err)
+			if err := tx.Rollback(); err != nil {
+				fmt.Printf("ロールバックエラー: %v\n", err)
+			}
 			os.Exit(1)
 		}
 	}
 
+	if err := tx.Commit(); err != nil {
+		fmt.Printf("トランザクションコミットエラー: %v", err)
+	}
 	fmt.Println("完了🦩")
 }
