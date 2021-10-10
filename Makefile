@@ -1,4 +1,4 @@
-OUTPUT := "./"
+OUTPUT := ${GOPATH}/bin
 
 .PHONY: build
 build: ## バイナリをビルド
