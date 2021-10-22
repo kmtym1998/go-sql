@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -21,6 +22,21 @@ var RootCmd = &cobra.Command{
 	Run:   callback,
 }
 
+type Cfg struct {
+	DSN []DSNCfg `json:"dsn"`
+}
+
+type DSNCfg struct {
+	Name     string `json:"name"`
+	Driver   string `json:"driver"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	Host     string `json:"host"`
+	Port     string `json:"port"`
+	DBName   string `json:"db_name"`
+	SSLMode  string `json:"ssl_mode"`
+}
+
 // コマンド実行時に最初に呼ばれる初期化処理
 func init() {
 	// フラグの定義
@@ -28,6 +44,7 @@ func init() {
 	// 第3引数: デフォルト値、第4引数: フラグの説明
 	RootCmd.Flags().StringP("target", "t", "", "[必須] SQLファイルまでのpath or SQLファイルが入ったディレクトリまでのpath")
 	RootCmd.Flags().StringP("database-url", "d", "", "[必須] DB接続情報 (postgresとmysqlしか対応してない)")
+	RootCmd.Flags().StringP("config", "c", "", "[任意] 設定JSONファイルのパス (.go-gql.json)")
 }
 
 // 必須バリデーション
@@ -57,16 +74,50 @@ func getContent(path string) (string, error) {
 
 // コマンドの中身の処理
 func callback(cmd *cobra.Command, args []string) {
+	// NOTE: dsnの読み取り優先順位
+	// 1. コマンドラインからの入力値
+	// 2. .go-sql.jsonの値
+	// 3. 環境変数 GO_SQL_DATABASE_URL の値
+	var dsn string
+	var dsnTmp string
+	dsn = os.Getenv("GO_SQL_DATABASE_URL")
+
+	configPath, err := cmd.Flags().GetString("config")
+	if err != nil {
+		fmt.Printf("config取得エラー: %v\n", err)
+		os.Exit(1)
+	}
+	// config のJSONを読む
+	if configPath != "" {
+		raw, err := ioutil.ReadFile(configPath)
+		if err != nil {
+			fmt.Printf("設定ファイルを取得できませんでした: %v", err.Error())
+			os.Exit(1)
+		}
+		var cfg Cfg
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			fmt.Printf("設定ファイルの型が不正です: %v", err.Error())
+			os.Exit(1)
+		}
+
+		for _, dsn := cfg.DSN{
+
+		}
+	}
+
 	// flagの読み取り
 	target, err := cmd.Flags().GetString("target")
 	if err != nil {
 		fmt.Printf("target取得エラー: %v\n", err)
 		os.Exit(1)
 	}
-	dsn, err := cmd.Flags().GetString("database-url")
+	dsnTmp, err = cmd.Flags().GetString("database-url")
 	if err != nil {
 		fmt.Printf("database-url取得エラー: %v\n", err)
 		os.Exit(1)
+	}
+	if dsnTmp != "" {
+		dsn = dsnTmp
 	}
 
 	// flagの値の必須チェック
@@ -74,7 +125,7 @@ func callback(cmd *cobra.Command, args []string) {
 		fmt.Printf("バリデーションエラー: %v\n", err)
 		os.Exit(1)
 	}
-	if validate("database-url", dsn); err != nil {
+	if err := validate("database-url", dsn); err != nil {
 		fmt.Printf("バリデーションエラー: %v\n", err)
 		os.Exit(1)
 	}

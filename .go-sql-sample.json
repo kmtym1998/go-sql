@@ -1,0 +1,24 @@
+{
+  "dsn": [
+    {
+      "name": "default",
+      "driver": "postgres",
+      "user": "user",
+      "password": "secret",
+      "host": "localhost",
+      "port": "5432",
+      "db_name": "postgres",
+      "ssl_mode": "disable"
+    },
+    {
+      "name": "test",
+      "driver": "postgres",
+      "user": "user",
+      "password": "secret",
+      "host": "localhost",
+      "port": "5432",
+      "db_name": "test",
+      "ssl_mode": "disable"
+    }
+  ]
+}
