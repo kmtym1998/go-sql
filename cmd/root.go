@@ -18,7 +18,7 @@ import (
 var RootCmd = &cobra.Command{
 	Use:   "go-sql",
 	Short: "接続情報が与えられたDBに対してSQLを実行する",
-	Long:  "接続情報が与えられたDBに対してSQLを実行する。\nSQLファイルまでのパスを指定するとそれを単体実行。\nSQLファイルのあるディレクトリを指定するとその配下のSQLファイルを全実行する。",
+	Long:  "接続情報が与えられたDBに対してSQLを実行する。\n接続情報は環境変数 `GO_SQL_DATABASE_URL` または 設定ファイル または コマンドライン引数で指定可能。\nSQLファイルまでのパスを指定するとそれを単体実行。\nSQLファイルのあるディレクトリを指定するとその配下のSQLファイルを全実行する。",
 	Run:   callback,
 }
 
@@ -42,9 +42,10 @@ func init() {
 	// フラグの定義
 	// 第1引数: フラグ名、第2引数: 省略したフラグ名
 	// 第3引数: デフォルト値、第4引数: フラグの説明
-	RootCmd.Flags().StringP("target", "t", "", "[必須] SQLファイルまでのpath or SQLファイルが入ったディレクトリまでのpath")
-	RootCmd.Flags().StringP("database-url", "d", "", "[必須] DB接続情報 (postgresとmysqlしか対応してない)")
-	RootCmd.Flags().StringP("config", "c", "", "[任意] 設定JSONファイルのパス (.go-gql.json)")
+	RootCmd.Flags().StringP("target", "t", "", "[必須] SQLファイルまでのパス or SQLファイルが入ったディレクトリまでのパス")
+	RootCmd.Flags().StringP("database-url", "d", "", "[任意] Database URL (postgresとmysqlしか対応してない)")
+	RootCmd.Flags().StringP("config", "c", "", "[任意] 設定JSONファイル(.go-gql.json)までのパス")
+	RootCmd.Flags().StringP("config-name", "n", "", "[任意] 設定JSONファイルを指定したときに使用する設定の名前。指定しなければdefaultが入る")
 }
 
 // 必須バリデーション
@@ -78,9 +79,8 @@ func callback(cmd *cobra.Command, args []string) {
 	// 1. コマンドラインからの入力値
 	// 2. .go-sql.jsonの値
 	// 3. 環境変数 GO_SQL_DATABASE_URL の値
-	var dsn string
-	var dsnTmp string
-	dsn = os.Getenv("GO_SQL_DATABASE_URL")
+	var DB_URL string
+	DB_URL = os.Getenv("GO_SQL_DATABASE_URL")
 
 	configPath, err := cmd.Flags().GetString("config")
 	if err != nil {
@@ -99,9 +99,24 @@ func callback(cmd *cobra.Command, args []string) {
 			fmt.Printf("設定ファイルの型が不正です: %v", err.Error())
 			os.Exit(1)
 		}
-
-		for _, dsn := cfg.DSN{
-
+		cn, err := cmd.Flags().GetString("config-name")
+		if err != nil {
+			fmt.Printf("config-name取得エラー: %v\n", err)
+			os.Exit(1)
+		}
+		if cn == "" {
+			cn = "default"
+		}
+		found := false
+		for _, dsnCfg := range cfg.DSN {
+			if dsnCfg.Name == cn {
+				// postgres://user:password@host:5432/db_name?sslmode=disable
+				DB_URL = dsnCfg.Driver + "://" + dsnCfg.User + ":" + dsnCfg.Password + "@" + dsnCfg.Host + ":" +dsnCfg.Port + "/" + dsnCfg.DBName + "?sslmode=" + dsnCfg.SSLMode
+				found = true
+			}
+			if found {
+				break
+			}
 		}
 	}
 
@@ -111,13 +126,13 @@ func callback(cmd *cobra.Command, args []string) {
 		fmt.Printf("target取得エラー: %v\n", err)
 		os.Exit(1)
 	}
-	dsnTmp, err = cmd.Flags().GetString("database-url")
+	dsnTmp, err := cmd.Flags().GetString("database-url")
 	if err != nil {
 		fmt.Printf("database-url取得エラー: %v\n", err)
 		os.Exit(1)
 	}
 	if dsnTmp != "" {
-		dsn = dsnTmp
+		DB_URL = dsnTmp
 	}
 
 	// flagの値の必須チェック
@@ -125,8 +140,8 @@ func callback(cmd *cobra.Command, args []string) {
 		fmt.Printf("バリデーションエラー: %v\n", err)
 		os.Exit(1)
 	}
-	if err := validate("database-url", dsn); err != nil {
-		fmt.Printf("バリデーションエラー: %v\n", err)
+	if DB_URL == "" {
+		fmt.Print("DB接続情報が見つかりません")
 		os.Exit(1)
 	}
 
@@ -160,14 +175,14 @@ func callback(cmd *cobra.Command, args []string) {
 	}
 
 	// DATABASE URLをパース
-	u, err := url.Parse(dsn)
+	u, err := url.Parse(DB_URL)
 	if err != nil {
 		fmt.Printf("URLのパースエラー: %v\n", err)
 		os.Exit(1)
 	}
 
 	// DB接続
-	db, err := sql.Open(u.Scheme, dsn)
+	db, err := sql.Open(u.Scheme, DB_URL)
 	if err != nil {
 		fmt.Printf("DB接続失敗: %v\n", err)
 		os.Exit(1)
