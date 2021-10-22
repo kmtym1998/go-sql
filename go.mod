@@ -1,4 +1,4 @@
-module github.com/kmtym1998/golang-sql
+module github.com/kmtym1998/go-sql
 
 go 1.16
 

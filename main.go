@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kmtym1998/golang-sql/cmd"
+	"github.com/kmtym1998/go-sql/cmd"
 )
 
 func main() {
